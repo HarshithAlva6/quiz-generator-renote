@@ -4,7 +4,8 @@ import {createContext, ReactNode, useContext, useState} from 'react';
 
 type QuizCard = {
     question: string,
-    answer: string
+    theAnswer: string,
+    options: string[]
 }
 type QuizContextType = {
     quizCards: QuizCard[],
