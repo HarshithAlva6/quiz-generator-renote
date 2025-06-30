@@ -7,7 +7,7 @@ const BACKEND_API_URL = process.env.NEXT_PUBLIC_BACKEND_API_URL;
 
 interface allCardsWithDistractors {
   question: string;
-  theAnswer: string;
+  theAnswer: string[];
   options: string[];
 }
 
@@ -67,9 +67,10 @@ export function useQuizGenerator () {
           for (const card of cards) {
             const [question, answer] = card.split('\n');
             if (question && answer && await isValidQuestion(question)) {
+              const theAnswerArray = answer.split(',').map(item => item.trim()).filter(item => item !== '');
               const distractors = await fetchDistractors(question, answer, notes)
-              const allOptions = shuffleArray([answer, ...distractors])
-              allCards.push({question: question.trim(), theAnswer: answer.trim(), options: allOptions})
+              const allOptions = shuffleArray([...theAnswerArray, ...distractors])
+              allCards.push({question: question.trim(), theAnswer: theAnswerArray, options: allOptions})
             }
           }
           console.log(allCards, "allCards");

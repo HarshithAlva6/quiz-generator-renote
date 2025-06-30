@@ -87,16 +87,17 @@ app.post('/generateDistractors', async (req,res) => {
             throw new Error("Google API Key is not configured in the backend environment.");
         }
 
+        const theAnswerArray = theAnswer.split(',').map(item => item.trim()).filter(item => item != '');
         // Construct the prompt for Gemini
-        let prompt = `I need ${numDistractors} plausible but incorrect distractors for a multiple-choice question.
+        let prompt = `I need ${numDistractors} plausible but incorrect distractors for a multiple-choice question that can have multiple correct answers.
         Question: "${question}"
-        Correct Answer: "${theAnswer}"`;
+        Correct Answers (select all that apply): ${JSON.stringify(theAnswerArray)}`;
 
         if (context) {
             prompt += `\nContext/Topic: "${context}"`;
         }
 
-        prompt += `\nProvide the distractors as a JSON array of strings, like: ["distractor1", "distractor2", "distractor3"]. Do not include the correct answer.`;
+        prompt += `\nProvide the distractors as a JSON array of strings, like: ["distractor1", "distractor2", "distractor3"]. Do not include any of the provided correct answers in the list of distractors.`;
 
         const result = await model.generateContent(prompt);
         const response = await result.response;
