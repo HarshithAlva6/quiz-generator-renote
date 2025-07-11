@@ -73,12 +73,12 @@ export function Quiz() {
         <div className = "p-4 border rounded shadow mb-4">
         <h2 className="text-xl font-bold mb-4">Score: {score} / {quizCards.length}</h2>
         <p className="text-lg font-semibold mb-4">{curCard.question}</p>
-            <div className = "space-y-3">
+            <div className = "space-y-3 max-h-60 overflow-y-auto pr-2">
             {availableOptions.length > 0 ? (
                 availableOptions.map((option, index) => {
                 let optionClasses = "block w-full p-3 rounded-md text-left transition-colors duration-200";
                 const isSelectedCurrentClick = option === selectedOption;
-                if (wrongChosen){
+                if (wrongChosen || allFound){
                         // If incorrect answer was chosen, all options become disabled and styled gray
                         optionClasses += " bg-gray-100 text-gray-700 border border-gray-300 opacity-50 cursor-not-allowed";
                     } else {
@@ -94,7 +94,7 @@ export function Quiz() {
                         key={index}
                         className={optionClasses}
                         onClick={() => handleOption(option)}
-                        disabled={wrongChosen}>
+                        disabled={wrongChosen || allFound}>
                         {option}
                         </button>
                     );

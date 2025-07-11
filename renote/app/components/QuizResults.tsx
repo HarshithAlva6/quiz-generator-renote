@@ -1,5 +1,4 @@
-// app/components/QuizResults.tsx
-'use client'; // This component also needs to be a client component
+'use client'; 
 
 import React from 'react';
 import {useRouter} from 'next/navigation';
