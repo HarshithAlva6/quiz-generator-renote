@@ -24,7 +24,6 @@ const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
 //}
 
 async function query(data) {
-    console.log(process.env.HF_TOKEN);
   const response = await fetch(
     "https://router.huggingface.co/hf-inference/models/mrsinghania/asr-question-detection",
     {
