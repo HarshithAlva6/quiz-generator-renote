@@ -15,7 +15,6 @@ export default function Home() {
   }
   return (
     <div className="max-w-3xl mx-auto text-center">
-      <h1 className = "text-3xl font-bold mb-4">ReNote</h1>
       <div className="shadow-lg rounded-xl flex items-center justify-center mb-4 p-3">
         <textarea 
           value={notes}
@@ -26,14 +25,17 @@ export default function Home() {
       <div className="flex justify-center">
         {generating ? (
         <button
-          className="bg-indigo-500 px-6 py-3 rounded-lg text-white flex items-center gap-2">
+          className="mt-4 px-6 py-2 rounded-lg bg-violet-600 text-white font-semibold border-b-2 border-violet-800 flex items-center gap-2 text-base translate-y-0.5 shadow-none cursor-wait"
+          style={{WebkitBackdropFilter: 'blur(8px)'}}
+          disabled
+        >
           <div className="animate-spin rounded-full h-4 w-4 border-b-3"></div>
           Generating Questions...
         </button>):
         (<button
           onClick = {handleGenerate}
           disabled = {!notes.trim()}
-          className="bg-indigo-500 px-6 py-3 rounded-lg text-white flex items-center gap-2">
+          className={`mt-4 px-6 py-2 rounded-lg bg-violet-600 text-white font-semibold shadow-lg border-b-4 border-violet-800 hover:bg-violet-700 transition-all duration-150 active:translate-y-0.5 active:shadow-none flex items-center gap-2 text-base ${!notes.trim() ? 'bg-gray-200 text-gray-400 cursor-not-allowed border-gray-200 hover:bg-gray-200' : ''}`}>
             Generate Quiz
         </button>)}
       </div>

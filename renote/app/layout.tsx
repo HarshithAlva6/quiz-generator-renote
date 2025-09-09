@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ReNote",
-  description: "Notes reinforced learning",
+  title: "Revise Notes with ReNote",
+  description: "Notes Reinforced Learning",
 };
 
 export default function RootLayout({
@@ -26,10 +26,18 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen`}
       >
         <QuizContextProvider>
-        {children}
+          <header className="w-full py-6 px-4 bg-white/80 shadow-md mb-8">
+            <div className="max-w-3xl mx-auto flex items-center gap-2 justify-center">
+              <span className="text-2xl font-bold text-indigo-700 tracking-tight">ReNote</span>
+              <span className="ml-2 text-sm text-gray-500 font-mono">Notes Reinforced Learning</span>
+            </div>
+          </header>
+          <main className="max-w-3xl mx-auto px-4">
+            {children}
+          </main>
         </QuizContextProvider>
       </body>
     </html>
