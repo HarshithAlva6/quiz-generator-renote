@@ -3,7 +3,7 @@ import { MongoClient, ServerApiVersion } from 'mongodb';
 import { v4 as uuidv4 } from 'uuid';
 import crypto from 'crypto';
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
-import { GoogleGenerativeAIEmbeddings } from '@langchain/google-genai'; // Only need embeddings here
+import { GoogleGenerativeAIEmbeddings } from '@langchain/google-genai';
 import { MongoDBAtlasVectorSearch } from '@langchain/mongodb';
 import { createClient } from 'redis';
 
@@ -11,14 +11,12 @@ import { createClient } from 'redis';
 // --- Environment Variables ---
 // These MUST be set in your .env.local file (and your deployment environment like Vercel)
 const MONGODB_URI = process.env.MONGODB_URI || "";
-console.log(MONGODB_URI);
 const DB_NAME = "notesdb";
 const QUIZ_CARDS_COLLECTION = "quizCards";
 const NOTE_CHUNKS_COLLECTION = "notesChunk";
-const VECTOR_SEARCH_INDEX_NAME = "embed"; // Make sure this matches your MongoDB Atlas Vector Search index name
+const VECTOR_SEARCH_INDEX_NAME = "embed";
 const REDIS_URL = process.env.REDIS_URL || ""; // Your Upstash Redis URL
 const CACHE_TTL_SECONDS = 3600;
-
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY_EMBED || ""; // Your Google Gemini API Key (for embeddings)
 
 // --- IMPORTANT: This points to your *separate* ai-service-backend.js ---
@@ -37,7 +35,6 @@ async function connectToDatabase() {
   if (!dbConnected) {
     await client.connect();
     dbConnected = true;
-    console.log("Successfully connected to MongoDB!");
   }
   return client.db(DB_NAME);
 }
@@ -72,7 +69,6 @@ let redisClient: ReturnType<typeof createClient> | null = null;
 async function getRedisClient() {
   if (!redisClient) {
     if (!REDIS_URL) {
-      console.error("REDIS_URL is not set. Caching will be disabled.");
       return null;
     }
     try {
@@ -80,11 +76,10 @@ async function getRedisClient() {
         url: REDIS_URL,
       });
       redisClient.on('error', err => console.error('Redis Client Error', err));
-      await redisClient.connect(); // Connect the client
-      console.log("Successfully connected to Redis!");
+      await redisClient.connect();
     } catch (error) {
       console.error("Failed to connect to Redis:", error);
-      redisClient = null; // Ensure client is null on failed connection
+      redisClient = null;
       return null;
     }
   }
@@ -98,6 +93,8 @@ export async function POST(req: Request) {
   if (!notes) {
     return new Response(JSON.stringify({ error: 'Notes are required' }), { status: 400 });
   }
+
+  const trimmedNotes = notes.replace(/\r\n/g, '\n').trim();
 
   const db = await connectToDatabase();
   const quizCardsCollection = db.collection(QUIZ_CARDS_COLLECTION);
@@ -113,21 +110,19 @@ export async function POST(req: Request) {
   const retriever = vectorStore.asRetriever();
 
   const generatedQuizCards: allCardsWithDistractors[] = [];
-  const entries = notes.trim();
+  const entries = trimmedNotes;
   const cards = entries.split(/\n\s*\n/);
 
-  const fullNotesHash = generateSha256Hash(notes);
+  const fullNotesHash = generateSha256Hash(trimmedNotes);
   const redis = await getRedisClient();
 
   let notesAlreadyIngested = false;
-  console.log(fullNotesHash, "Full Notes AH");
   try {
     const existingChunk = await noteChunksCollection.findOne({
       "originalFullNotesHash": fullNotesHash
     });
     if(existingChunk){
       notesAlreadyIngested = true;
-      console.log(`Full notes (hash: ${fullNotesHash}) already ingested. Skipping re-embedding.`);      
     }
   }
   catch (error){
@@ -136,13 +131,12 @@ export async function POST(req: Request) {
   // --- Step 1: Process and Ingest Notes into Vector Database (RAG Preprocessing) ---
   if (!notesAlreadyIngested) {
     try {
-      const docs = await textSplitter.createDocuments([notes]);
+      const docs = await textSplitter.createDocuments([trimmedNotes]);
       const docsWithMetadata = docs.map(doc => ({
         ...doc,
         metadata: { ...doc.metadata, originalFullNotesHash: fullNotesHash }
       }));
       await vectorStore.addDocuments(docsWithMetadata);
-      console.log("Notes chunks embedded and stored in MongoDB Atlas using Gemini Embeddings.");
     } catch (error) {
       console.error("Error during notes ingestion into vector store:", error);
     }
@@ -153,7 +147,6 @@ export async function POST(req: Request) {
   for (const card of cards) {
     const [questionRaw, answerRaw] = card.split('\n');
     if (!questionRaw || !answerRaw) {
-      console.warn("Skipping malformed card segment:", card);
       continue;
     }
 
@@ -168,7 +161,6 @@ export async function POST(req: Request) {
       try {
         const cachedCard = await redis.get(currentQuizCardHash);
         if (cachedCard) {
-          console.log(`Serving individual quiz card from Redis cache (hash: ${currentQuizCardHash})`);
           quizCardToReturn = JSON.parse(cachedCard);
         }
       } catch (cacheError) {
@@ -180,7 +172,6 @@ export async function POST(req: Request) {
       try {
         const existingQuizCard = await quizCardsCollection.findOne<allCardsWithDistractors & { originalNotesHash: string }>({ originalNotesHash: currentQuizCardHash });
         if (existingQuizCard) {
-          console.log(`Serving individual quiz card from MongoDB (hash: ${currentQuizCardHash})`);
           quizCardToReturn = {
             question: existingQuizCard.question,
             theAnswer: existingQuizCard.theAnswer,
@@ -190,7 +181,6 @@ export async function POST(req: Request) {
           if (redis) {
             try {
               await redis.setEx(currentQuizCardHash, CACHE_TTL_SECONDS, JSON.stringify(quizCardToReturn));
-              console.log(`Stored individual quiz card in Redis cache from Mongo (hash: ${currentQuizCardHash}).`);
             } catch (cacheError) {
               console.error(`Error storing individual card in Redis from Mongo (${currentQuizCardHash}):`, cacheError);
             }
@@ -208,7 +198,6 @@ export async function POST(req: Request) {
         // --- RAG Step: Retrieve context from vector database ---
         const relevantDocs = await retriever.invoke(question);
         const retrievedContext = relevantDocs.map(doc => doc.pageContent).join("\n\n");
-        console.log(`Retrieved context for "${question}":\n${retrievedContext.substring(0, Math.min(retrievedContext.length, 200))}...`);
 
         const isQuestionResponse = await fetch(`${AI_SERVICE_BACKEND_URL}/isQuestion`, {
             method: "POST", headers: {"Content-Type": "application/json"},
@@ -237,40 +226,34 @@ export async function POST(req: Request) {
           const theAnswerArray = answer.split(',').map(item => item.trim()).filter(item => item !== '');
           const allOptions = shuffleArray([...theAnswerArray, ...distractors]);
 
-          quizCardToReturn = { // Assign to the shared variable
+          quizCardToReturn = {
             question: question,
             theAnswer: theAnswerArray,
             options: allOptions,
           };
 
-          const newQuizCardDocument = { // The document to insert into Mongo
-            quizCardId: uuidv4(), originalNotesHash: currentQuizCardHash, // Ensure originalNotesHash is correctly set
+          const newQuizCardDocument = {
+            quizCardId: uuidv4(), originalNotesHash: currentQuizCardHash,
             question: question, theAnswer: theAnswerArray, options: allOptions,
             generatedAt: new Date().toISOString(),
           };
 
           await quizCardsCollection.insertOne(newQuizCardDocument);
-          console.log(`Generated and stored new quiz card in MongoDB (hash: ${currentQuizCardHash}).`);
-
           // --- NEW CACHING STEP 3: Store newly generated card in Redis ---
           if (redis) {
             try {
               await redis.setEx(currentQuizCardHash, CACHE_TTL_SECONDS, JSON.stringify(quizCardToReturn));
-              console.log(`Stored newly generated quiz card in Redis cache (hash: ${currentQuizCardHash}).`);
             } catch (cacheError) {
               console.error(`Error storing newly generated card in Redis (${currentQuizCardHash}):`, cacheError);
             }
           }
-
-        } else {
-          console.warn(`Question "${question}" deemed invalid by Hugging Face AI. Skipping.`);
         }
       } catch (error) {
         console.error(`Error processing quiz card "${question}":`, error);
       }
     }
 
-    if (quizCardToReturn) { // Only push if a valid card was obtained/generated
+    if (quizCardToReturn) {
         generatedQuizCards.push(quizCardToReturn);
     }
   }
